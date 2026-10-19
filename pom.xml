@@ -34,6 +34,7 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
+			<version>4.0.4</version>
 		</dependency>
 
 		<dependency>
@@ -54,11 +55,13 @@
 			<artifactId>spring-boot-devtools</artifactId>
 			<scope>runtime</scope>
 			<optional>true</optional>
+			<version>4.0.6</version>
 		</dependency>
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
+			<version>42.7.12</version>
 		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
