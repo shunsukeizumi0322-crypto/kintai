@@ -4,10 +4,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -18,10 +15,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.hackathon.kintai.model.Attendance;
-import com.hackathon.kintai.model.Shift;
 import com.hackathon.kintai.model.User;
 import com.hackathon.kintai.repository.AttendanceRepository;
-import com.hackathon.kintai.repository.ShiftRepository;
 import com.hackathon.kintai.repository.UserRepository;
 
 import jakarta.servlet.http.HttpServletResponse; // 💡 追加
@@ -35,7 +30,6 @@ public class AdminController {
 
     private final UserRepository userRepo;
     private final AttendanceRepository attendanceRepo;
-    private final ShiftRepository shiftRepo; // Supabaseのシフトテーブル用リポジトリ
 
     // 💡 管理者のセッションチェックを行う共通ロジック
     private boolean isInvalidAdminSession(HttpSession session) {
@@ -114,31 +108,6 @@ public class AdminController {
         model.addAttribute("selectedStartDate", startDate);
         model.addAttribute("selectedEndDate", endDate);
         model.addAttribute("histories", histories);
-
-        // シフトデータの取得・復元処理
-        String targetMonth = (month != null && !month.isEmpty()) ? month : YearMonth.now().toString();
-        List<Shift> dbShifts = shiftRepo.findAll();
-
-        Map<String, String> savedShifts = new HashMap<>();
-        for (Shift s : dbShifts) {
-            String currentUid = s.getUserId();
-            if ("0".equals(currentUid) || "minus".equals(currentUid) || "none".equals(currentUid)) {
-                if ("0".equals(currentUid)) {
-                    currentUid = "minus";
-                }
-                if (s.getShiftIn() != null && !s.getShiftIn().isEmpty()) {
-                    savedShifts.put("shift_minus_" + currentUid + "_" + s.getYearMonth() + "_" + s.getDay(), s.getShiftIn());
-                }
-            } else {
-                if (s.getShiftIn() != null && !s.getShiftIn().isEmpty()) {
-                    savedShifts.put("shift_in_" + currentUid + "_" + s.getYearMonth() + "_" + s.getDay(), s.getShiftIn());
-                }
-                if (s.getShiftOut() != null && !s.getShiftOut().isEmpty()) {
-                    savedShifts.put("shift_out_" + currentUid + "_" + s.getYearMonth() + "_" + s.getDay(), s.getShiftOut());
-                }
-            }
-        }
-        model.addAttribute("savedShifts", savedShifts);
 
         return "admin_dash";
     }
@@ -251,11 +220,6 @@ public class AdminController {
             List<Attendance> userAttendances = attendanceRepo.findAllByUserIdOrderByStartTimeDesc(targetUser.getUserId());
             attendanceRepo.deleteAll(userAttendances);
 
-            try {
-                shiftRepo.deleteByUserId(targetUser.getUserId());
-            } catch (Exception e) {
-                System.out.println("シフト削除エラー: " + e.getMessage());
-            }
 
             userRepo.delete(targetUser);
             redirectAttributes.addFlashAttribute("success", "ユーザー「" + targetUser.getName() + "」と、対応するシフト・勤怠データを削除しました。");
@@ -338,83 +302,6 @@ public class AdminController {
         }
 
         keepFilters(redirectAttributes, filterUserId, filterMonth, filterStartDate, filterEndDate);
-        return "redirect:/admin";
-    }
-
-    @PostMapping("/save-shifts")
-    public String saveShifts(HttpSession session, HttpServletResponse response,
-                             @RequestParam Map<String, String> allParams,
-                             @RequestParam(required = false) String month, 
-                             @RequestParam(required = false) String userId,
-                             @RequestParam(required = false) String startDate, 
-                             @RequestParam(required = false) String endDate,
-                             RedirectAttributes redirectAttributes) {
-        
-        // 🌟 管理者チェック & キャッシュ禁止ヘッダーをがっちり防御
-        if (isInvalidAdminSession(session)) return "redirect:/?error=already_logged_in";
-        setNoCacheHeaders(response);
-
-        try {
-            // 🚀 JavaScriptから届いた「変更されたマス（hidden要素）」の数だけループが回ります
-            for (Map.Entry<String, String> entry : allParams.entrySet()) {
-                String key = entry.getKey();
-                String value = entry.getValue();
-
-                // 1. シフト関連のキー（shift_から始まるもの）だけを狙い撃ち（CSRF等を除外）
-                if (key.startsWith("shift_")) {
-                    String[] parts = key.split("_");
-                    if (parts.length < 5) continue;
-
-                    String type = parts[1]; // "in", "out", "minus"
-                    int dayNum = Integer.parseInt(parts[parts.length - 1]); // 末尾は必ず日付
-                    String recordMonth = parts[parts.length - 2];           // 末尾から2番目は必ず年月
-
-                    // 2. ユーザーIDの復元（minus行の例外処理と、IDに「_」が含まれる場合の結合処理を維持）
-                    String shiftUserId = "";
-                    if ("minus".equals(type)) {
-                        shiftUserId = "0";
-                    } else {
-                        StringBuilder sb = new StringBuilder();
-                        for (int i = 2; i < parts.length - 2; i++) {
-                            if (i > 2) sb.append("_");
-                            sb.append(parts[i]);
-                        }
-                        shiftUserId = sb.toString();
-                    }
-
-                    // 3. 変更があった該当日のデータをDBから1件だけピンポイント検索
-                    Optional<Shift> existingShift = shiftRepo.findByUserIdAndYearMonthAndDay(shiftUserId, recordMonth, dayNum);
-                    Shift shift;
-                    if (existingShift.isPresent()) {
-                        shift = existingShift.get();
-                    } else {
-                        // DBにまだなければ新しくインスタンスを生成
-                        shift = new Shift();
-                        shift.setUserId(shiftUserId);
-                        shift.setYearMonth(recordMonth);
-                        shift.setDay(dayNum);
-                    }
-
-                    // 4. 「入」「出」「不足人数」に応じて、書き換えられた値だけをピンポイントにセット
-                    if ("in".equals(type)) {
-                        shift.setShiftIn(value);
-                    } else if ("out".equals(type)) {
-                        shift.setShiftOut(value);
-                    } else if ("minus".equals(type)) {
-                        shift.setShiftIn(value);
-                    }
-
-                    // 5. DBに保存（変更分だけのコミットになるため超高速）
-                    shiftRepo.save(shift);
-                }
-            }
-            redirectAttributes.addFlashAttribute("success", "変更されたシフトを保存しました。");
-        } catch (Exception e) {
-            redirectAttributes.addFlashAttribute("error", "保存中にエラーが発生しました: " + e.getMessage());
-        }
-
-        // 🌟 元の画面に戻ったとき、検索条件（月や従業員フィルター）が外れないように状態をキープ
-        keepFilters(redirectAttributes, userId, month, startDate, endDate);
         return "redirect:/admin";
     }
 }

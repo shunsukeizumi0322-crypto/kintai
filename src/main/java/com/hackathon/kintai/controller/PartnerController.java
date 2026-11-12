@@ -12,12 +12,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Controller
@@ -26,7 +22,6 @@ public class PartnerController {
 
     @Autowired private AttendanceRepository attendanceRepo;
     @Autowired private UserRepository userRepo;
-    @Autowired private ShiftRepository shiftRepo; 
 
     // セッションチェック共通ロジック
     private boolean isInvalidSession(HttpSession session) {
@@ -100,37 +95,6 @@ public class PartnerController {
         model.addAttribute("startDate", startDate); 
         model.addAttribute("endDate", endDate); 
         model.addAttribute("titleLabel", titleLabel); 
-
-        // ==========================================
-        // 🔔 【完全コンプリート判定版】翌月分シフト提出チェック
-        // ==========================================
-        LocalDate today = LocalDate.now();
-        if (today.getDayOfMonth() >= 25) {
-            // 翌月オブジェクトを生成（例: 2026-07）
-            LocalDate nextMonthDate = today.plusMonths(1);
-            String nextMonthStr = nextMonthDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));
-            
-            // 💡 翌月が「合計で何日あるか（30日か、31日か）」を自動取得
-            int totalDaysInNextMonth = YearMonth.from(nextMonthDate).lengthOfMonth();
-            
-            // 翌月分として「出勤時間(shiftIn)が入力されている日数」をカウント
-            long submittedDaysCount = shiftRepo.findAll().stream()
-                    .filter(s -> user.getUserId().equals(s.getUserId()) 
-                                && nextMonthStr.equals(s.getYearMonth())
-                                && s.getShiftIn() != null 
-                                && !s.getShiftIn().isEmpty())
-                    .count();
-            
-            // 💡 「翌月の日数」と「入力された日数」が完全に一致していない場合はアラートを出す
-            if (submittedDaysCount < totalDaysInNextMonth) {
-                model.addAttribute("showShiftAlert", Boolean.TRUE); 
-                model.addAttribute("alertMonth", nextMonthStr);
-            } else {
-                model.addAttribute("showShiftAlert", Boolean.FALSE);
-            }
-        } else {
-            model.addAttribute("showShiftAlert", Boolean.FALSE); 
-        }
 
         return "partner_dash";
     }
@@ -222,89 +186,5 @@ public class PartnerController {
         session.setAttribute("user", user);
         ra.addFlashAttribute("success", "パスワードを更新しました。");
         return "redirect:/partner";
-    }
-
-    // シフト申請画面を表示する
-    @GetMapping("/shift/request")
-    public String showShiftRequest(@RequestParam(name = "month", required = false) String month, 
-                                   HttpSession session, 
-                                   Model model) {
-        if (isInvalidSession(session)) return "redirect:/?error=already_logged_in";
-        User user = (User) session.getAttribute("user");
-        model.addAttribute("user", user);
-
-        if (month == null || month.isEmpty()) {
-            month = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
-        }
-        model.addAttribute("currentMonth", month);
-
-        List<Shift> dbShifts = shiftRepo.findAll();
-
-        Map<String, String> htmlShifts = new HashMap<>();
-        for (Shift s : dbShifts) {
-            if (user.getUserId().equals(s.getUserId()) && month.equals(s.getYearMonth())) {
-                String dayStr = String.valueOf(s.getDay());
-                if (s.getShiftIn() != null && !s.getShiftIn().isEmpty()) {
-                    htmlShifts.put("shift_in_" + user.getUserId() + "_" + month + "_" + dayStr, s.getShiftIn());
-                }
-                if (s.getShiftOut() != null && !s.getShiftOut().isEmpty()) {
-                    htmlShifts.put("shift_out_" + user.getUserId() + "_" + month + "_" + dayStr, s.getShiftOut());
-                }
-            }
-        }
-        model.addAttribute("dbShifts", htmlShifts);
-
-        return "partner_shift_request";
-    }
-
-    // シフトデータを保存する
-    @PostMapping("/shift/submit")
-    public String submitShiftRequest(@RequestParam Map<String, String> allParams, 
-                                     @RequestParam(name = "targetMonth", required = false) String targetMonth,
-                                     HttpSession session) {
-        if (isInvalidSession(session)) return "redirect:/?error=already_logged_in";
-        User user = (User) session.getAttribute("user");
-
-        for (Map.Entry<String, String> entry : allParams.entrySet()) {
-            String key = entry.getKey();
-            String value = entry.getValue();
-
-            if (key.startsWith("shift_in_")) {
-                String[] parts = key.split("_");
-                String userId = parts[2];
-                String yearMonthStr = parts[3]; 
-                int day = Integer.parseInt(parts[4]);
-
-                String outKey = "shift_out_" + userId + "_" + yearMonthStr + "_" + day;
-                String startTime = value;
-                String endTime = allParams.getOrDefault(outKey, "");
-
-                Optional<Shift> existingShift = shiftRepo.findByUserIdAndYearMonthAndDay(userId, yearMonthStr, day);
-                Shift shift;
-                if (existingShift.isPresent()) {
-                    shift = existingShift.get();
-                } else {
-                    shift = new Shift();
-                    shift.setUserId(userId);
-                    shift.setYearMonth(yearMonthStr);
-                    shift.setDay(day);
-                }
-
-                shift.setShiftIn(startTime);
-                shift.setShiftOut(endTime);
-
-                if (startTime.isEmpty() && endTime.isEmpty() && shift.getId() == null) {
-                    continue;
-                }
-
-                shiftRepo.save(shift);
-            }
-        }
-
-        String redirectUrl = "/partner/shift/request?success=true";
-        if (targetMonth != null && !targetMonth.isEmpty()) {
-            redirectUrl += "&month=" + targetMonth;
-        }
-        return "redirect:" + redirectUrl;
     }
 }

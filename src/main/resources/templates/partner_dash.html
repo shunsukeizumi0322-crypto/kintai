@@ -74,7 +74,6 @@
         margin-left: auto !important;
         margin-right: auto !important;
     }
-}
 
     /* 5. 余白リセット */
     .navbar-nav.ms-auto {
@@ -191,27 +190,6 @@
 
     <div class="container">
         
-        <ul class="nav nav-tabs mb-4">
-            <li class="nav-item">
-                <a class="nav-link active" th:href="@{/partner}">🏠 ホーム (打刻)</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" th:href="@{/partner/shift/request}">
-                    <span>📅 シフト申請</span>
-                </a>
-            </li>
-        </ul>
-
-        <div th:if="${showShiftAlert}" class="alert alert-danger d-flex align-items-center mb-4 shadow-sm border-0" role="alert" style="border-left: 6px solid #dc3545; background-color: #fff5f5;">
-            <i class="bi bi-exclamation-triangle-fill fs-3 text-danger me-3"></i>
-            <div>
-                <h5 class="alert-heading fw-bold m-0 mb-1 text-danger" style="font-size: 1.1rem;">⚠️ 来月分のシフトが未提出です</h5>
-                <p class="m-0 small text-dark">
-                    <strong th:text="${alertMonth}"></strong> 分の希望シフトデータがまだ送信されていません。
-                    25日を過ぎていますので、至急 <a th:href="@{/partner/shift/request(month=${alertMonth})}" class="alert-link text-decoration-underline fw-bold text-danger">📅 シフト申請画面</a> から希望時間を入力して送信してください。
-                </p>
-            </div>
-        </div>
 
         <div th:if="${success}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
             <span th:text="${success}"></span>
