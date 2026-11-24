@@ -187,4 +187,32 @@ public class PartnerController {
         ra.addFlashAttribute("success", "パスワードを更新しました。");
         return "redirect:/partner";
     }
+    @PostMapping("/partner/profile-update")
+public String updateProfile(@RequestParam String name,
+                            @RequestParam(required = false) String phone,
+                            @RequestParam(required = false) String workplace,
+                            HttpSession session,
+                            RedirectAttributes redirectAttributes) {
+    // ログイン中のユーザーをセッションから取得
+    User loginUser = (User) session.getAttribute("user");
+    if (loginUser == null) {
+        return "redirect:/login";
+    }
+
+    if (name == null || name.trim().isEmpty()) {
+        return "redirect:/partner?error=name_empty";
+    }
+
+    // 入力された値で更新してDBに保存（userRepository は既存のものをそのまま利用）
+    loginUser.setName(name.trim());
+    loginUser.setPhone(phone);
+    loginUser.setWorkplace(workplace);
+    userRepository.save(loginUser);
+
+    // セッション情報も最新に更新
+    session.setAttribute("user", loginUser);
+
+    redirectAttributes.addFlashAttribute("success", "プロフィールを更新しました。");
+    return "redirect:/partner";
+}
 }

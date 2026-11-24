@@ -17,5 +17,24 @@ public class User {
     private String name;     // 名前
     private String password; // パスワード
     private String role;     // "ADMIN"（管理者）か "PARTNER"（パートナー）
-    private String currentSessionId;    
+    private String currentSessionId; 
+    
+    // 既存のフィールド（userId, name, password, role など）の下に追加
+private String phone;
+private String workplace;
+
+// getter と setter
+public String getPhone() {
+    return phone;
+}
+public void setPhone(String phone) {
+    this.phone = phone;
+}
+
+public String getWorkplace() {
+    return workplace;
+}
+public void setWorkplace(String workplace) {
+    this.workplace = workplace;
+}
 }
