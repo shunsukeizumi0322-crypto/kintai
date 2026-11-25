@@ -14,27 +14,37 @@ public class User {
     @Column(unique = true)
     private String userId; // 自動で割り振るユーザー番号（例：1001）
 
-    private String name;     // 名前
+    private String name; // 名前
     private String password; // パスワード
-    private String role;     // "ADMIN"（管理者）か "PARTNER"（パートナー）
-    private String currentSessionId; 
-    
-    // 既存のフィールド（userId, name, password, role など）の下に追加
-private String phone;
-private String workplace;
+    private String role; // "ADMIN"（管理者）か "PARTNER"（パートナー）
+    private String currentSessionId;
 
-// getter と setter
-public String getPhone() {
-    return phone;
-}
-public void setPhone(String phone) {
-    this.phone = phone;
-}
+    private String department;
+    private String phone;
+    private String workplace;
 
-public String getWorkplace() {
-    return workplace;
-}
-public void setWorkplace(String workplace) {
-    this.workplace = workplace;
-}
+    public String getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
+    }
+
+    // getter と setter
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getWorkplace() {
+        return workplace;
+    }
+
+    public void setWorkplace(String workplace) {
+        this.workplace = workplace;
+    }
 }

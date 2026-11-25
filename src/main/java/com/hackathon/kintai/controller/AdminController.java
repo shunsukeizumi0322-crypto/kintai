@@ -34,14 +34,15 @@ public class AdminController {
     // 💡 管理者のセッションチェックを行う共通ロジック
     private boolean isInvalidAdminSession(HttpSession session) {
         User sessionUser = (User) session.getAttribute("user");
-        if (sessionUser == null || !"ADMIN".equals(sessionUser.getRole())) return true;
-        
+        if (sessionUser == null || !"ADMIN".equals(sessionUser.getRole()))
+            return true;
+
         User dbUser = userRepo.findById(sessionUser.getId()).orElse(null);
         if (dbUser == null) {
             session.invalidate();
             return true;
         }
-        
+
         String currentSessionId = session.getId();
         if (dbUser.getCurrentSessionId() == null || !dbUser.getCurrentSessionId().equals(currentSessionId)) {
             session.invalidate();
@@ -58,20 +59,25 @@ public class AdminController {
     }
 
     private void keepFilters(RedirectAttributes attrs, String userId, String month, String start, String end) {
-        if (userId != null && !userId.isEmpty()) attrs.addAttribute("userId", userId);
-        if (month != null && !month.isEmpty()) attrs.addAttribute("month", month);
-        if (start != null && !start.isEmpty()) attrs.addAttribute("startDate", start);
-        if (end != null && !end.isEmpty()) attrs.addAttribute("endDate", end);
+        if (userId != null && !userId.isEmpty())
+            attrs.addAttribute("userId", userId);
+        if (month != null && !month.isEmpty())
+            attrs.addAttribute("month", month);
+        if (start != null && !start.isEmpty())
+            attrs.addAttribute("startDate", start);
+        if (end != null && !end.isEmpty())
+            attrs.addAttribute("endDate", end);
     }
 
     @GetMapping
     public String dashboard(HttpSession session, HttpServletResponse response, Model model,
-                            @RequestParam(name = "userId", required = false) String userId,
-                            @RequestParam(name = "month", required = false) String month,
-                            @RequestParam(name = "startDate", required = false) String startDate,
-                            @RequestParam(name = "endDate", required = false) String endDate) {
+            @RequestParam(name = "userId", required = false) String userId,
+            @RequestParam(name = "month", required = false) String month,
+            @RequestParam(name = "startDate", required = false) String startDate,
+            @RequestParam(name = "endDate", required = false) String endDate) {
         // 🌟 1. 管理者チェック & 2. キャッシュ禁止ヘッダー適用
-        if (isInvalidAdminSession(session)) return "redirect:/?error=already_logged_in";
+        if (isInvalidAdminSession(session))
+            return "redirect:/?error=already_logged_in";
         setNoCacheHeaders(response);
 
         List<User> userlist = userRepo.findAll();
@@ -94,7 +100,8 @@ public class AdminController {
         boolean hasDate = (startDatetime != null && endDatetime != null);
 
         if (hasUser && hasDate) {
-            histories = attendanceRepo.findAllByUserIdAndStartTimeBetweenOrderByStartTimeDesc(userId, startDatetime, endDatetime);
+            histories = attendanceRepo.findAllByUserIdAndStartTimeBetweenOrderByStartTimeDesc(userId, startDatetime,
+                    endDatetime);
         } else if (hasUser) {
             histories = attendanceRepo.findAllByUserIdOrderByStartTimeDesc(userId);
         } else if (hasDate) {
@@ -114,46 +121,58 @@ public class AdminController {
 
     @PostMapping("/register")
     public String register(HttpSession session, HttpServletResponse response,
-                           @RequestParam String name, @RequestParam String password, @RequestParam String role,
-                           @RequestParam(required = false) String filterUserId, @RequestParam(required = false) String filterMonth,
-                           @RequestParam(required = false) String filterStartDate, @RequestParam(required = false) String filterEndDate,
-                           RedirectAttributes redirectAttributes) {
-        if (isInvalidAdminSession(session)) return "redirect:/?error=already_logged_in";
+            @RequestParam String name,
+            @RequestParam String password,
+            @RequestParam String role,
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) String phone,
+            @RequestParam(required = false) String workplace,
+            @RequestParam(required = false) String filterUserId,
+            @RequestParam(required = false) String filterMonth,
+            @RequestParam(required = false) String filterStartDate,
+            @RequestParam(required = false) String filterEndDate,
+            RedirectAttributes redirectAttributes) {
+        if (isInvalidAdminSession(session))
+            return "redirect:/?error=already_logged_in";
         setNoCacheHeaders(response);
 
         User user = new User();
         user.setName(name);
         user.setPassword(password);
         user.setRole(role);
+        user.setDepartment(department);
+        user.setPhone(phone);
+        user.setWorkplace(workplace);
 
-        // 💡 重複を絶対に防ぐ安全な採番ロジック
-        // DB内の全ユーザーから、最大のuser_id（を数値変換したもの）を見つけて +1 する
         int maxId = userRepo.findAll().stream()
                 .map(u -> {
                     try {
                         return Integer.parseInt(u.getUserId());
                     } catch (NumberFormatException e) {
-                        return 1000; // 数値変換できないイレギュラーなID（admin等）は1000として扱う
+                        return 1000;
                     }
                 })
                 .max(Integer::compareTo)
-                .orElse(1000); // 1人もいない場合は1000からスタート
+                .orElse(1000);
 
-        user.setUserId(String.valueOf(maxId + 1)); // 最大のIDの「次の番号」を確実に割り当てる
+        user.setUserId(String.valueOf(maxId + 1));
         userRepo.save(user);
 
+        redirectAttributes.addFlashAttribute("success", "ユーザー「" + name + "」を登録しました。");
         keepFilters(redirectAttributes, filterUserId, filterMonth, filterStartDate, filterEndDate);
         return "redirect:/admin";
     }
 
     @PostMapping("/edit")
     public String edit(HttpSession session, HttpServletResponse response,
-                       @RequestParam Long id, @RequestParam String startTime, @RequestParam String endTime,
-                       @RequestParam(required = false, defaultValue = "0") Integer breakMinutes,
-                       @RequestParam(required = false) String filterUserId, @RequestParam(required = false) String filterMonth,
-                       @RequestParam(required = false) String filterStartDate, @RequestParam(required = false) String filterEndDate,
-                       RedirectAttributes redirectAttributes) {
-        if (isInvalidAdminSession(session)) return "redirect:/?error=already_logged_in";
+            @RequestParam Long id, @RequestParam String startTime, @RequestParam String endTime,
+            @RequestParam(required = false, defaultValue = "0") Integer breakMinutes,
+            @RequestParam(required = false) String filterUserId, @RequestParam(required = false) String filterMonth,
+            @RequestParam(required = false) String filterStartDate,
+            @RequestParam(required = false) String filterEndDate,
+            RedirectAttributes redirectAttributes) {
+        if (isInvalidAdminSession(session))
+            return "redirect:/?error=already_logged_in";
         setNoCacheHeaders(response);
 
         LocalDateTime now = LocalDateTime.now();
@@ -199,11 +218,13 @@ public class AdminController {
 
     @PostMapping("/delete-user")
     public String deleteUser(HttpSession session, HttpServletResponse response,
-                             @RequestParam Long targetId, @RequestParam String adminPassword,
-                             @RequestParam(required = false) String filterUserId, @RequestParam(required = false) String filterMonth,
-                             @RequestParam(required = false) String filterStartDate, @RequestParam(required = false) String filterEndDate,
-                             RedirectAttributes redirectAttributes) {
-        if (isInvalidAdminSession(session)) return "redirect:/?error=already_logged_in";
+            @RequestParam Long targetId, @RequestParam String adminPassword,
+            @RequestParam(required = false) String filterUserId, @RequestParam(required = false) String filterMonth,
+            @RequestParam(required = false) String filterStartDate,
+            @RequestParam(required = false) String filterEndDate,
+            RedirectAttributes redirectAttributes) {
+        if (isInvalidAdminSession(session))
+            return "redirect:/?error=already_logged_in";
         setNoCacheHeaders(response);
 
         User admin = (User) session.getAttribute("user");
@@ -217,12 +238,13 @@ public class AdminController {
 
         User targetUser = userRepo.findById(targetId).orElse(null);
         if (targetUser != null) {
-            List<Attendance> userAttendances = attendanceRepo.findAllByUserIdOrderByStartTimeDesc(targetUser.getUserId());
+            List<Attendance> userAttendances = attendanceRepo
+                    .findAllByUserIdOrderByStartTimeDesc(targetUser.getUserId());
             attendanceRepo.deleteAll(userAttendances);
 
-
             userRepo.delete(targetUser);
-            redirectAttributes.addFlashAttribute("success", "ユーザー「" + targetUser.getName() + "」と、対応するシフト・勤怠データを削除しました。");
+            redirectAttributes.addFlashAttribute("success",
+                    "ユーザー「" + targetUser.getName() + "」と、対応するシフト・勤怠データを削除しました。");
         }
 
         keepFilters(redirectAttributes, filterUserId, filterMonth, filterStartDate, filterEndDate);
@@ -231,12 +253,14 @@ public class AdminController {
 
     @PostMapping("/create-attendance")
     public String createAttendance(HttpSession session, HttpServletResponse response,
-                                   @RequestParam String targetUserId, @RequestParam String startTime, @RequestParam String endTime,
-                                   @RequestParam(required = false, defaultValue = "0") Integer breakMinutes,
-                                   @RequestParam(required = false) String filterUserId, @RequestParam(required = false) String filterMonth,
-                                   @RequestParam(required = false) String filterStartDate, @RequestParam(required = false) String filterEndDate,
-                                   RedirectAttributes redirectAttributes) {
-        if (isInvalidAdminSession(session)) return "redirect:/?error=already_logged_in";
+            @RequestParam String targetUserId, @RequestParam String startTime, @RequestParam String endTime,
+            @RequestParam(required = false, defaultValue = "0") Integer breakMinutes,
+            @RequestParam(required = false) String filterUserId, @RequestParam(required = false) String filterMonth,
+            @RequestParam(required = false) String filterStartDate,
+            @RequestParam(required = false) String filterEndDate,
+            RedirectAttributes redirectAttributes) {
+        if (isInvalidAdminSession(session))
+            return "redirect:/?error=already_logged_in";
         setNoCacheHeaders(response);
 
         LocalDateTime now = LocalDateTime.now();
@@ -269,7 +293,8 @@ public class AdminController {
             }
         }
 
-        User targetUser = userRepo.findAll().stream().filter(u -> u.getUserId().equals(targetUserId)).findFirst().orElse(null);
+        User targetUser = userRepo.findAll().stream().filter(u -> u.getUserId().equals(targetUserId)).findFirst()
+                .orElse(null);
         if (targetUser != null) {
             Attendance a = new Attendance();
             a.setUserId(targetUser.getUserId());
@@ -287,11 +312,13 @@ public class AdminController {
 
     @PostMapping("/delete-attendances")
     public String deleteAttendances(HttpSession session, HttpServletResponse response,
-                                    @RequestParam(required = false) List<Long> attendanceIds,
-                                    @RequestParam(required = false) String filterUserId, @RequestParam(required = false) String filterMonth,
-                                    @RequestParam(required = false) String filterStartDate, @RequestParam(required = false) String filterEndDate,
-                                    RedirectAttributes redirectAttributes) {
-        if (isInvalidAdminSession(session)) return "redirect:/?error=already_logged_in";
+            @RequestParam(required = false) List<Long> attendanceIds,
+            @RequestParam(required = false) String filterUserId, @RequestParam(required = false) String filterMonth,
+            @RequestParam(required = false) String filterStartDate,
+            @RequestParam(required = false) String filterEndDate,
+            RedirectAttributes redirectAttributes) {
+        if (isInvalidAdminSession(session))
+            return "redirect:/?error=already_logged_in";
         setNoCacheHeaders(response);
 
         if (attendanceIds != null && !attendanceIds.isEmpty()) {

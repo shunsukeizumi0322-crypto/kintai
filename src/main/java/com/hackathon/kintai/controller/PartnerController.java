@@ -20,13 +20,16 @@ import java.util.stream.Collectors;
 @RequestMapping("/partner")
 public class PartnerController {
 
-    @Autowired private AttendanceRepository attendanceRepo;
-    @Autowired private UserRepository userRepo;
+    @Autowired
+    private AttendanceRepository attendanceRepo;
+    @Autowired
+    private UserRepository userRepo;
 
     // セッションチェック共通ロジック
     private boolean isInvalidSession(HttpSession session) {
         User sessionUser = (User) session.getAttribute("user");
-        if (sessionUser == null) return true;
+        if (sessionUser == null)
+            return true;
         User dbUser = userRepo.findById(sessionUser.getId()).orElse(null);
         if (dbUser == null) {
             session.invalidate();
@@ -34,7 +37,7 @@ public class PartnerController {
         }
         String currentSessionId = session.getId();
         if (dbUser.getCurrentSessionId() == null || !dbUser.getCurrentSessionId().equals(currentSessionId)) {
-            session.invalidate(); 
+            session.invalidate();
             return true;
         }
         return false;
@@ -42,18 +45,19 @@ public class PartnerController {
 
     // 従業員ダッシュボード画面表示
     @GetMapping
-    public String dashboard(HttpSession session, 
-                            HttpServletResponse response, 
-                            Model model, 
-                            @RequestParam(name = "startDate", required = false) String startDate,
-                            @RequestParam(name = "endDate", required = false) String endDate) {
-        if (isInvalidSession(session)) return "redirect:/?error=already_logged_in";
+    public String dashboard(HttpSession session,
+            HttpServletResponse response,
+            Model model,
+            @RequestParam(name = "startDate", required = false) String startDate,
+            @RequestParam(name = "endDate", required = false) String endDate) {
+        if (isInvalidSession(session))
+            return "redirect:/?error=already_logged_in";
         User user = (User) session.getAttribute("user");
-        
+
         response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         response.setHeader("Pragma", "no-cache");
         response.setDateHeader("Expires", 0);
-        
+
         Attendance active = attendanceRepo.findTopByUserIdAndEndTimeIsNullOrderByStartTimeDesc(user.getUserId());
         String currentStatus = "OFF";
         if (active != null) {
@@ -70,9 +74,9 @@ public class PartnerController {
                 LocalDateTime endOfPeriod = LocalDate.parse(endDate).atTime(23, 59, 59);
 
                 filteredHistories = allHistories.stream()
-                        .filter(h -> h.getStartTime() != null && 
-                                     !h.getStartTime().isBefore(startOfPeriod) && 
-                                     !h.getStartTime().isAfter(endOfPeriod))
+                        .filter(h -> h.getStartTime() != null &&
+                                !h.getStartTime().isBefore(startOfPeriod) &&
+                                !h.getStartTime().isAfter(endOfPeriod))
                         .collect(Collectors.toList());
 
                 DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd");
@@ -92,9 +96,9 @@ public class PartnerController {
         model.addAttribute("user", user);
         model.addAttribute("myHistories", filteredHistories);
         model.addAttribute("status", currentStatus);
-        model.addAttribute("startDate", startDate); 
-        model.addAttribute("endDate", endDate); 
-        model.addAttribute("titleLabel", titleLabel); 
+        model.addAttribute("startDate", startDate);
+        model.addAttribute("endDate", endDate);
+        model.addAttribute("titleLabel", titleLabel);
 
         return "partner_dash";
     }
@@ -102,9 +106,10 @@ public class PartnerController {
     // 出勤打刻
     @PostMapping("/clock-in")
     public String clockIn(HttpSession session) {
-        if (isInvalidSession(session)) return "redirect:/?error=already_logged_in";
+        if (isInvalidSession(session))
+            return "redirect:/?error=already_logged_in";
         User user = (User) session.getAttribute("user");
-        
+
         Attendance active = attendanceRepo.findTopByUserIdAndEndTimeIsNullOrderByStartTimeDesc(user.getUserId());
         if (active == null) {
             Attendance a = new Attendance();
@@ -119,10 +124,11 @@ public class PartnerController {
     // 休憩開始
     @PostMapping("/break-start")
     public String breakStart(HttpSession session) {
-        if (isInvalidSession(session)) return "redirect:/?error=already_logged_in";
+        if (isInvalidSession(session))
+            return "redirect:/?error=already_logged_in";
         User user = (User) session.getAttribute("user");
         Attendance a = attendanceRepo.findTopByUserIdAndEndTimeIsNullOrderByStartTimeDesc(user.getUserId());
-        
+
         if (a != null && a.getBreakStartTime() == null) {
             a.setBreakStartTime(LocalDateTime.now());
             attendanceRepo.save(a);
@@ -133,10 +139,11 @@ public class PartnerController {
     // 休憩終了
     @PostMapping("/break-end")
     public String breakEnd(HttpSession session) {
-        if (isInvalidSession(session)) return "redirect:/?error=already_logged_in";
+        if (isInvalidSession(session))
+            return "redirect:/?error=already_logged_in";
         User user = (User) session.getAttribute("user");
         Attendance a = attendanceRepo.findTopByUserIdAndEndTimeIsNullOrderByStartTimeDesc(user.getUserId());
-        
+
         if (a != null && a.getBreakStartTime() != null && a.getBreakEndTime() == null) {
             a.setBreakEndTime(LocalDateTime.now());
             attendanceRepo.save(a);
@@ -147,10 +154,11 @@ public class PartnerController {
     // 退勤打刻
     @PostMapping("/clock-out")
     public String clockOut(HttpSession session) {
-        if (isInvalidSession(session)) return "redirect:/?error=already_logged_in";
+        if (isInvalidSession(session))
+            return "redirect:/?error=already_logged_in";
         User user = (User) session.getAttribute("user");
         Attendance a = attendanceRepo.findTopByUserIdAndEndTimeIsNullOrderByStartTimeDesc(user.getUserId());
-        
+
         if (a != null && a.getEndTime() == null) {
             a.setEndTime(LocalDateTime.now());
             attendanceRepo.save(a);
@@ -160,12 +168,13 @@ public class PartnerController {
 
     // パスワード変更
     @PostMapping("/password-reset")
-    public String resetPassword(@RequestParam String newPassword, 
-                                @RequestParam String confirmPassword, 
-                                HttpSession session, 
-                                RedirectAttributes ra) {
-        if (isInvalidSession(session)) return "redirect:/?error=already_logged_in";
-        
+    public String resetPassword(@RequestParam String newPassword,
+            @RequestParam String confirmPassword,
+            HttpSession session,
+            RedirectAttributes ra) {
+        if (isInvalidSession(session))
+            return "redirect:/?error=already_logged_in";
+
         if (newPassword.matches(".*[^\\x21-\\x7e].*")) {
             return "redirect:/partner?error=invalid_characters";
         }
@@ -187,32 +196,36 @@ public class PartnerController {
         ra.addFlashAttribute("success", "パスワードを更新しました。");
         return "redirect:/partner";
     }
-    @PostMapping("/partner/profile-update")
-public String updateProfile(@RequestParam String name,
-                            @RequestParam(required = false) String phone,
-                            @RequestParam(required = false) String workplace,
-                            HttpSession session,
-                            RedirectAttributes redirectAttributes) {
-    // ログイン中のユーザーをセッションから取得
-    User loginUser = (User) session.getAttribute("user");
-    if (loginUser == null) {
-        return "redirect:/login";
+
+    // プロフィール（氏名・電話番号・勤務場所）更新
+    @PostMapping("/profile-update")
+    public String updateProfile(@RequestParam String name,
+            @RequestParam(required = false) String phone,
+            @RequestParam(required = false) String workplace,
+            HttpSession session,
+            RedirectAttributes redirectAttributes) {
+        if (isInvalidSession(session))
+            return "redirect:/?error=already_logged_in";
+
+        if (name == null || name.trim().isEmpty()) {
+            return "redirect:/partner?error=name_empty";
+        }
+
+        User sessionUser = (User) session.getAttribute("user");
+        User user = userRepo.findById(sessionUser.getId()).orElse(null);
+        if (user == null) {
+            session.invalidate();
+            return "redirect:/?error=already_logged_in";
+        }
+
+        user.setName(name.trim());
+        user.setPhone(phone);
+        user.setWorkplace(workplace);
+        userRepo.save(user);
+
+        session.setAttribute("user", user);
+
+        redirectAttributes.addFlashAttribute("success", "プロフィールを更新しました。");
+        return "redirect:/partner";
     }
-
-    if (name == null || name.trim().isEmpty()) {
-        return "redirect:/partner?error=name_empty";
-    }
-
-    // 入力された値で更新してDBに保存（userRepository は既存のものをそのまま利用）
-    loginUser.setName(name.trim());
-    loginUser.setPhone(phone);
-    loginUser.setWorkplace(workplace);
-    userRepository.save(loginUser);
-
-    // セッション情報も最新に更新
-    session.setAttribute("user", loginUser);
-
-    redirectAttributes.addFlashAttribute("success", "プロフィールを更新しました。");
-    return "redirect:/partner";
-}
 }
